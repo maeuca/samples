@@ -1,0 +1,118 @@
+package com.interview.cienna;
+
+
+/**
+ * Particle Animation Rules:
+ * 
+ * "speed" will be between 1 and 10 inclusive
+ *  init" will contain between 1 and 50 characters inclusive
+ *  each character in "init" will be '.' or 'L' or 'R'
+ * 
+ *  * 'L' for a leftward moving particle 
+ * 'R' for a rightward moving particle
+ *  '.' for an empty location
+ *  
+ */
+public class ParticleAnimation {
+
+	int movements = 0;
+
+	/**
+	
+	 * 
+	 * 
+	 * @param speed
+	 * @param init
+	 * @return
+	 */
+	public String[] animate(int speed, String init) {
+		String[] output = new String[0];
+
+		movements = initMovements(speed, init);
+		char[][] outputArr = new char[movements][init.length()];
+
+		positionParticle(speed, init.toUpperCase(),outputArr);
+
+		String[] location = new String[movements];
+		for (int i = 0; i < outputArr.length; i++) {
+			location[i] = String.valueOf(outputArr[i]).replace('\u0000', '.');
+		}
+		output = location;
+
+		return output;
+	}
+
+	/**
+	 * 
+	 * @param outputArr
+	 * @param speed
+	 * @param init
+	 */
+	private void positionParticle(final int speed,
+			final String init, char[][] output) {
+		char[] arr = init.toCharArray();
+		for (int k = 0; k < arr.length; k++) {
+			char c = arr[k];
+			int j = k;
+
+			if (c == 'L') {
+				for (int i = 0; i < output.length; i++) {
+					if (j > 0) {
+						output[i][j] = 'X';
+					} else {
+						break;
+					}
+					j = j - speed;
+				}
+			} else if (c == 'R') {
+				for (int i = 0; i < output.length; i++) {
+					if (j < output[i].length) {
+						output[i][j] = 'X';
+					} else {
+						break;
+					}
+					j = j + speed;
+				}
+			}
+		}
+	}
+
+	/**
+	 * 
+	 * @param speed
+	 * @param init
+	 * @return
+	 */
+	protected int initMovements(final int speed, final String init) {
+		char[] initarray = init.toCharArray();
+		int initial_input = 1;
+		for (int i = 0; i < initarray.length; i++) {
+			double temp = 0;
+
+			if (initarray[i] == 'L') {
+				temp = ((double) (i + 1) / (double) speed);
+				movements = Math.max((int) temp, movements);
+			} else if (initarray[i] == 'R') {
+				temp = ((double) (initarray.length - i) / (double) speed);
+				movements = Math.max((int) Math.ceil(temp), movements);
+			}
+		}
+		movements = movements + initial_input;
+		System.out.println("movements=" + movements);
+		return movements;
+	}
+
+
+	/**
+	 * @param args
+	 */
+	public static void main(String[] args) {
+		ParticleAnimation pa = new ParticleAnimation();
+		String[] output = pa.animate(1,  "LRRL.LR.LRR.R.LRRL.");
+		for (String out : output) {
+			System.out.println(out);
+		}
+
+	}
+
+}
