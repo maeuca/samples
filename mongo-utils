@@ -25,10 +25,10 @@ mongoose.connect(uri, function (err, res) {
     } else {
         console.log ('Succeeded connected to: ' + uri);
 
-        addCommunity("Accounting","Community of Accounting","Kinetix",acallback);
-        addCommunity("Sales","Community of Sales","Kinetix",acallback);
-        addCommunity("Marketing","Community of Marketing","Kinetix",acallback);
-        addCommunity("Engineering","Community of Engineering","Virtual Command",acallback);
+        addCommunity("Accounting","Community of Accounting","CompanyA",acallback);
+        addCommunity("Sales","Community of Sales","CompanyA",acallback);
+        addCommunity("Marketing","Community of Marketing","CompanyA",acallback);
+        addCommunity("Engineering","Community of Engineering","CompanyB",acallback);
 
         getCommunity("Accounting",acallback);
 
