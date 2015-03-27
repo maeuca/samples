@@ -1,0 +1,106 @@
+var mongoose = require('mongoose'),
+    Schema = mongoose.Schema;
+
+/**
+ * Community Schema
+ */
+var CommunitySchema = new Schema({
+    name: { type: String, default: 'Public', unique: true, required: true, trim: true },
+    description: { type: String, default: '', required: false, trim: true },
+    parent: { type: String, default: '', required: false, trim: true },
+    isActive: { type: Boolean, default: true, required: true, trim: true },
+    members: { type: Array, default: [], required: false, trim: true }
+
+});
+
+var uri = 'mongodb://localhost/virtualcommand-dev';
+
+var acallback = function(){
+}
+var Community = mongoose.model( 'Community', CommunitySchema );
+
+mongoose.connect(uri, function (err, res) {
+    if (err) {
+        console.log ('ERROR connecting to: ' + uri + '. ' + err);
+    } else {
+        console.log ('Succeeded connected to: ' + uri);
+
+        addCommunity("Accounting","Community of Accounting","Kinetix",acallback);
+        addCommunity("Sales","Community of Sales","Kinetix",acallback);
+        addCommunity("Marketing","Community of Marketing","Kinetix",acallback);
+        addCommunity("Engineering","Community of Engineering","Virtual Command",acallback);
+
+        getCommunity("Accounting",acallback);
+
+        deleteCommunity("Sales",acallback);
+
+
+    }
+});
+
+var deleteCommunity = function(theName,callback){
+    Community.findOne({ name:theName }, function(err, thecommunity) {
+        if (err){
+            console.error('deleteCommunity find error ' + err);
+        }
+
+        if (thecommunity )
+        {
+            thecommunity.remove(function(err, deleted_community) {
+                if (err){
+                    console.error('deleteCommunity error ' + err);
+                }
+
+            });
+        }
+
+
+        console.log('delete completed for ' + theName);
+        callback();
+    });
+}
+var getCommunity = function(theName,callback)
+{
+
+    Community.findOne(
+        {name:theName},
+        function(err,data) {
+            if (err) {
+                console.log('Community not found-' + err);
+            }
+            else if (data)
+            {
+                console.log(theName + ' Community found ' + JSON.stringify(data));
+            }
+            else
+            {
+                console.log('Community not found ' + theName);
+            }
+        }
+    );
+}
+
+var addCommunity = function(theName,theDescription,theParent,callback)
+{
+    var acommunity = new Community ({
+        name: theName,
+        description: theDescription,
+        parent: theParent
+    });
+
+
+    Community.findOneAndUpdate(
+        {name:theName},
+        {name: theName, description:theDescription, parent: theParent} ,
+        {upsert: true},
+            function(err) {
+                if (err) {
+                    console.log('Community update error-' + err);
+                }
+                else{
+                    console.log('Community update completed');
+                }
+                callback();
+            }
+    );
+}
