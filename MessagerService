@@ -1,0 +1,181 @@
+package cantrelm.webservice.faye;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.cometd.bayeux.Channel;
+import org.cometd.bayeux.Message;
+import org.cometd.bayeux.client.ClientSessionChannel;
+import org.cometd.bayeux.client.ClientSessionChannel.MessageListener;
+import org.cometd.client.BayeuxClient;
+import org.cometd.client.transport.ClientTransport;
+import org.cometd.client.transport.LongPollingTransport;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.websocket.client.WebSocketClient;
+import org.cometd.websocket.client.JettyWebSocketTransport;
+public class MessagerService {
+
+	private Logger logger = Logger.getLogger("MessagerService");
+	private static MessagerService me = null;
+	private BayeuxClient client = null;
+	
+	private HttpClient httpClient;
+	WebSocketClient webSocketClient;
+	
+	String host;
+	int port;
+	
+	private List<MessagerSubscription>subscriptions = Collections.synchronizedList( new ArrayList<MessagerSubscription>());
+	private MessagerService(String host, int port)
+	{
+		this.host = host;
+		this.port = port;
+		
+		startConnection();
+	}
+	
+	private void startConnection()
+	{
+		// ws client
+	
+		webSocketClient = new WebSocketClient();
+		try {
+			webSocketClient.start();
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, e.getMessage());
+		}
+		ClientTransport wsTransport = new JettyWebSocketTransport(new HashMap<String, Object>(), null, webSocketClient);
+		System.out.println("websocket transport ready");
+
+		// -------- // 
+				
+			
+		// http client
+		httpClient = new HttpClient();
+		try {
+			httpClient.start();
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, e.getMessage());
+		}
+		ClientTransport httpTransport = new LongPollingTransport(
+				new HashMap<String, Object>(), httpClient);
+		System.out.println("http transport ready");
+		// -------- // 
+		
+		client = new BayeuxClient(
+				"http://" + host + ":" + port + "/messager", wsTransport, httpTransport);
+	
+		
+		client.getChannel(Channel.META_HANDSHAKE).addListener(
+				new ClientSessionChannel.MessageListener() {
+					public void onMessage(ClientSessionChannel channel,
+							Message message) {
+						if (message.isSuccessful()) {
+							System.out.println(">>handshake was successful<<");
+							for ( MessagerSubscription subscription: subscriptions)
+							{
+								MessageListener messageListener = subscription.getListener();
+								ClientSessionChannel clientChannel = subscription.getChannel();
+								clientChannel.subscribe(messageListener);
+								System.out.println("MessagerService subscription for " + subscription.channelName + " completed");
+								
+							}
+						}
+					}
+		});
+		
+		client.getChannel(Channel.META_DISCONNECT).addListener(
+				new ClientSessionChannel.MessageListener() {
+					public void onMessage(ClientSessionChannel channel,
+							Message message) {
+						if (message.isSuccessful()) {
+							System.out.println(">>client disconnected<<");
+						}
+					}
+		});
+		
+		client.handshake();
+	}
+	public synchronized void refreshConnection()
+	{
+		System.out.println("MessagerService refreshing connection...");
+		try {
+			httpClient.stop();
+		} catch (Exception e) {
+			 
+		}
+		try {
+			webSocketClient.stop();
+		} catch (Exception e) {
+			
+		}
+		
+		client.disconnect(new ClientSessionChannel.MessageListener() {
+
+			@Override
+			public void onMessage(ClientSessionChannel channel, Message message) {
+				if (message.isSuccessful()) {
+					System.out.println("MessagerService disconnect completed sucessfully");
+				}
+			}
+			
+		});
+		
+		startConnection();
+	
+	}
+	public synchronized BayeuxClient getClient()
+	{
+		return client;
+	}
+	
+	
+	public synchronized void unsubscribe(String channelName)
+	{
+		MessagerSubscription thesubscription = null;
+		for ( MessagerSubscription subscription: subscriptions)
+		{
+			MessageListener messageListener = subscription.getListener();
+			ClientSessionChannel clientChannel = subscription.getChannel();
+			String achannelName = subscription.getChannelName();
+			if ( achannelName.equalsIgnoreCase(channelName))
+			{
+				thesubscription = subscription;
+				clientChannel.unsubscribe(messageListener);
+				break;
+			}
+		}
+		if ( thesubscription!=null)
+		{
+			subscriptions.remove(thesubscription);
+			System.out.println("unsubcribe from " + channelName + " completed");
+		}
+	}
+	public synchronized void subscribe(String channelName, MessageListener messageListener){
+		
+		final ClientSessionChannel theChannel = client.getChannel(channelName);
+		MessagerSubscription subscription = new MessagerSubscription(theChannel,messageListener, channelName);
+
+		
+		if (!subscriptions.contains(subscription))
+		{
+			subscriptions.add(subscription);
+			theChannel.subscribe(messageListener);
+			System.out.println("New MessagerService subscription added " + subscription.channelName + " completed");
+		}
+	
+		
+	}
+	
+	public static synchronized MessagerService getInstance(String host, int port){
+		if ( me==null)
+			me = new MessagerService(host,port);
+		return me;
+	}
+	
+	public static void main(){}
+}
