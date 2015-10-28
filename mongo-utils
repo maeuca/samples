@@ -13,7 +13,7 @@ var CommunitySchema = new Schema({
 
 });
 
-var uri = 'mongodb://localhost/virtualcommand-dev';
+var uri = 'mongodb://localhost/dev';
 
 var acallback = function(){
 }
