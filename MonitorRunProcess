@@ -1,0 +1,141 @@
+package com.cantrelm.util;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+* Check for existance of JVM thread or Windows Process
+* Run method will wait for process to exit from windows task manager
+*
+*/
+public class MonitorRunProcess  extends Thread{
+	String processName = "";
+	Script script;
+	
+	public static Logger logger = Logger.getLogger("Main");
+
+	public MonitorRunProcess(Script script) {
+		super("Monitor-" + script.name);
+		this.script = script;
+		this.processName = script.name +  ".exe";
+	}
+	/**
+	* Helper Method.
+	* Determine if named thread is running in JVM
+	*
+	*/
+	public static synchronized boolean hasRunThread(String scriptname)
+	{
+		boolean hasThread = false;
+			Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+			Thread[] threadArray = threadSet.toArray(new Thread[threadSet.size()]);
+			for ( Thread athread: threadArray)
+			{
+				if ( athread.getName().equals( scriptname ) )
+				{
+					hasThread=true;
+				}
+			}
+		return hasThread;
+	}
+	/**
+	 * Helper Method
+	 * Determine if windows process in tasklist
+	 *
+	 */
+	public static synchronized boolean hasWindowsProcess(String scriptName, int scheduleid ) {
+		boolean isRunning = false;
+
+		String theprocessName = "Java_" + scriptName + "_" + scheduleid + ".exe";
+
+		String findtask = "tasklist /fi \"imagename eq " + "\"" + theprocessName	+ "\"\"";
+		try {
+			logger.log(Level.INFO, "Monitor- findtask=" + findtask);
+			Process p = Runtime.getRuntime().exec(findtask);
+			p.waitFor();
+			BufferedReader error = new BufferedReader(new InputStreamReader(	p.getErrorStream()));
+			String errors = null;
+			while ((errors = error.readLine()) != null) {
+				logger.log(Level.INFO, "ACM:Monitor- error " + errors);
+			}
+			error.close();
+
+			BufferedReader is = new BufferedReader(new InputStreamReader(p.getInputStream()));
+			String line = null;
+
+			while ((line = is.readLine()) != null) {
+				if (line.contains(theprocessName)) {
+					isRunning = true;
+				}
+			}
+
+			is.close();
+		} catch (Exception e) {
+			logger.log(Level.INFO, "MonitorRunProcess hasProcess "+ theprocessName + " - exception ", e);
+
+		}
+
+		logger.log(Level.INFO, "MonitorRunProcess hasProcess " + theprocessName+ " isRunning=" + isRunning);
+
+		return isRunning;
+	}
+	
+	/**
+	* Main run method to find and wait for a windows process to complete
+	*
+	*/
+	public void start()
+	{
+		boolean found = true;
+		try{
+			while ( found )
+			{
+				found = false;
+				String findtask = "tasklist /fi \"imagename eq " + "\"" + processName + "\"\"";
+				try {
+					Process p = Runtime.getRuntime().exec(findtask);
+					p.waitFor();
+					BufferedReader error = new BufferedReader(
+							new InputStreamReader(p.getErrorStream()));
+					String errors = null;
+					while ((errors = error.readLine()) != null) {
+						logger.log(Level.INFO, "Monitor- error " + errors);
+					}
+					error.close();
+
+					BufferedReader is = new BufferedReader(new InputStreamReader(
+							p.getInputStream()));
+					String line = null;
+					
+					while ((line = is.readLine()) != null) {
+						if (line.contains(processName)) {
+							found = true;
+						}
+					}
+
+					is.close();
+
+					Thread.sleep(15005);
+				} catch (Exception e) {
+					logger.log(Level.INFO, "Monitor- exception ", e);
+					found = false;
+				}
+				
+				logger.log(Level.INFO,"Monitor-end " + processName + " found=" + found);
+			}
+		}
+		catch(Exception e)
+		{
+			found = false;
+		}
+		finally
+		{
+			logger.log(Level.INFO,"Monitor-end " + processName);
+		}
+		
+	}
+
+}
