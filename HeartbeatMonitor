@@ -1,0 +1,121 @@
+package com.cantrelm.util;
+
+import java.net.InetAddress;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Map;
+import java.util.TimerTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.cometd.bayeux.Message;
+import org.cometd.bayeux.client.ClientSessionChannel;
+
+import com.cantrelm.common.EMail;
+import com.cantrelm.common.QueueData;
+import com.cantrelm.Main;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+
+public class HeartbeatMonitor {
+	public static Logger logger = Logger.getLogger("HeartbeatMonitor");
+	private long lastheartbeat = 0;
+	private int failedheartbeats = 0;
+	
+	private static HeartbeatMonitor me = null;
+	
+	public synchronized static HeartbeatMonitor getInstance(){
+		if ( me==null )
+			me = new HeartbeatMonitor();
+		return me;
+	}
+	private HeartbeatMonitor(){
+		this.startHeartbeat();
+	}
+    /**
+     * Timer runs every 30 seconds.
+     * When heartbeat not recieved within threshold enter alarm condtion
+     * @author cantrelm
+     *
+     */
+    class HeartbeatTask extends TimerTask {
+
+    	long alarm_threshold = (60 * 1000L) * 2;
+    	String msg = "{}";
+    	HeartbeatTask()
+    	{
+    		lastheartbeat = System.currentTimeMillis();
+    	}
+    	public void end(){
+    		this.cancel();	
+    	}
+		@Override
+		public void run() {
+			
+			long elapsedtime = System.currentTimeMillis() - lastheartbeat ;
+			this.msg = "{\"serverid\":"+Main.serverid+",\"state\":"+ "\"heartbeat\" }";
+		  	  
+			if ( elapsedtime > alarm_threshold )
+			{
+				failedheartbeats++;
+				if ( failedheartbeats > 10){
+					Main.sendCriticalEmail(lastheartbeat);
+					failedheartbeats=0;
+				}
+			}
+			else{
+				failedheartbeats=0;
+			}
+			try {
+				Main.messager.getClient().getChannel("/heartbeat").publish(msg,
+								new ClientSessionChannel.MessageListener() {
+									@Override
+									public void onMessage(
+											ClientSessionChannel channel,
+											Message message) {
+
+										if (message.isSuccessful()) {
+											logger.log(Level.INFO,"HeartbeatTask - send Sucessful");
+										} else {
+											logger.log(Level.INFO,"HeartbeatTask - send Failed");
+										}
+									}
+								});
+			} catch (Exception e) {
+				logger.log(Level.INFO, "HeartbeatTask - send Error");
+			}
+			
+		}
+    	
+    }
+    
+    private void startHeartbeat()
+	{
+		Main.messager.subscribe("/heartbeat",new ClientSessionChannel.MessageListener() {
+
+			@Override
+			public void onMessage(ClientSessionChannel arg0, Message message) {
+			
+					Map<String,Object> dataMap = message.getDataAsMap();
+					Object serverRows = dataMap.get("rows");
+					String json = Main.gson.toJson(serverRows);
+					JsonParser parser = new JsonParser();
+					JsonObject obj = parser.parse(json).getAsJsonObject();
+					QueueData data = Main.gson.fromJson(obj, QueueData.class);
+					
+					
+						lastheartbeat = System.currentTimeMillis();
+						logger.log(Level.INFO,"Recieved heartbeat");
+					
+			}});
+		
+		try{
+			Main.publisher.schedule(new HeartbeatTask(), 10001, 33111); 
+		}catch(Exception e)
+		{
+			logger.log(Level.INFO,"Starting heartbeat exception " +e.getMessage());
+		}	
+	}
+
+}
